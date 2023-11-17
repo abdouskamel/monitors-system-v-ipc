@@ -36,8 +36,7 @@ typedef struct
 } monitor;
 
 /*
- * Create a brand new monitor, with [nb_conds] conditions and a shared memory
- * of size [shm_size].
+ * Create a brand new monitor, with [nb_conds] conditions and a shared memory of size [shm_size].
  * [ftok_path] is used for generating a system V key for both shared memory and semaphores.
  * [shm_proj] is passed to ftok for shared memory, and [sem_proj] for semaphores.
  * @return 0 on success, -1 on failure.
@@ -60,8 +59,7 @@ int init_monitor(char *ftok_path, int shm_proj, int sem_proj, monitor *mtor);
 int free_monitor(monitor *mtor);
 
 /*
- * Ask to enter the monitor.
- * Only one process can be in the monitor.
+ * Ask to enter the monitor. Only one process at a time can be in the monitor.
  * @return 0 on success, -1 on failure.
  * Failure means that the demand failed, not that the process doesn't enter.
  */
@@ -69,8 +67,7 @@ int enter_monitor(monitor *mtor);
 
 /*
  * Ask to leave the monitor.
- * Note that while leaving a monitor, pending processes on signal take precedence
- * over processes that asked to enter the monitor.
+ * Note that while leaving a monitor, pending processes on signal take precedence over processes that asked to enter the monitor.
  * @return 0 on success, -1 on failure.
  * Failure means that the demand failed, not that the process doesn't enter.
  */

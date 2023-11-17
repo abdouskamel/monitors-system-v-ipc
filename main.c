@@ -8,70 +8,93 @@
 #include "monitor.h"
 
 #define NB_CONDS 1
+#define IPC_KEY_NAME "systemv_ipc_key"
 
+// Shared memory object
 typedef struct
 {
-    int arrived;
+    int work_result;
 
 } shm_mem;
 
 int main()
 {
+    pid_t pid1, pid2;
     monitor mtor;
-    create_monitor("p", 1, 2, NB_CONDS, sizeof(shm_mem), &mtor);
+
+    int err_code = create_monitor(IPC_KEY_NAME, 1, 2, NB_CONDS, sizeof(shm_mem), &mtor);
+    if (err_code != 0)
+    {
+        perror("Cannot create monitor");
+        return (EXIT_FAILURE);
+    }
 
     // Create first process
-    if (!fork())
+    pid1 = fork();
+    if (!pid1)
     {
         printf("P1 starts.\n");
-
-        // init_monitor not necessary, just for the example
-        init_monitor("p", 1, 2, &mtor);
+        init_monitor(IPC_KEY_NAME, 1, 2, &mtor);
 
         sleep(1);
         enter_monitor(&mtor);
 
         shm_mem *shm_ptr = mtor_shmat(&mtor);
 
-        // Don't wait if P2 arruved
-        if (!shm_ptr->arrived)
+        // Stop and wait for P2 to finish
+        if (!shm_ptr->work_result)
         {
             printf("P1 waits for P2.\n");
             mtor_wait(&mtor, 0);
         }
 
-        printf("P1 continues, arrived = %d\n", shm_ptr->arrived);
+        // Here, P1 has been woken up by P1
+        printf("P1 continues.\n");
+        
+        //  Wait for 2 seconds before terminating
+        sleep(2);
+        printf("P1 finished, work_result = %d\n", shm_ptr->work_result);
         mtor_shmdt(shm_ptr);
 
         exit_monitor(&mtor);
-        exit(0);
+        exit(EXIT_SUCCESS);
     }
 
-    // Create second process
-    if (!fork())
+    else
     {
-        printf("P2 starts.\n");
+        // Create second process
+        pid2 = fork();
+        if (!pid2)
+        {
+            init_monitor(IPC_KEY_NAME, 1, 2, &mtor);
 
-        // init_monitor not necessary, just for the example
-        init_monitor("p", 1, 2, &mtor);
+            // Wait for 5 seconds before entering the monitor (to simulate some workload)
+            sleep(5);
+            printf("P2 starts.\n");
+            enter_monitor(&mtor);
 
-        sleep(3);
-        enter_monitor(&mtor);
+            // Wait for 2 seconds before accessing shared memory
+            sleep(2);
 
-        shm_mem *shm_ptr = mtor_shmat(&mtor);
-        shm_ptr->arrived = 1;
-        mtor_shmdt(shm_ptr);
+            // Access the shared memory object and edit it with a random number
+            shm_mem *shm_ptr = mtor_shmat(&mtor);
+            shm_ptr->work_result = 42;
+            mtor_shmdt(shm_ptr);
 
-        printf("P2 wakes P1.\n");
-        mtor_signal(&mtor, 0);
+            printf("P2 finished. P2 wakes P1.\n");
+            mtor_signal(&mtor, 0);
 
-        exit_monitor(&mtor);
-        exit(0);
+            exit_monitor(&mtor);
+            exit(EXIT_SUCCESS);
+        }
+
+        else
+        {
+            // We are in parent process, just wait
+            while (wait(NULL) != -1) ;
+            free_monitor(&mtor);
+        }
     }
 
-    while (wait(NULL) != -1)
-        ;
-
-    free_monitor(&mtor);
-    return (0);
+    return (EXIT_FAILURE);
 }
